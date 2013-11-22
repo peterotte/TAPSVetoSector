@@ -30,16 +30,25 @@ end trigger;
 
 
 architecture RTL of trigger is
+	constant FirmwareType: integer := 6;
+	constant FirmwareRevision: integer := 7;
+	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
-	subtype sub_Adress is std_logic_vector(11 downto 4);
-	constant BASE_TRIG_InputPatternMask_IN1 : sub_Adress 			:= x"50" ; -- r/w
-	constant BASE_TRIG_InputPatternMask_IN2 : sub_Adress 			:= x"51" ; -- r/w
-	constant BASE_TRIG_InputPatternMask_IN3 : sub_Adress 			:= x"52" ; -- r/w
-	constant BASE_TRIG_InputPatternMask_INOUT1 : sub_Adress		:= x"53" ; -- r/w
-	constant BASE_TRIG_InputPatternMask_INOUT2 : sub_Adress		:= x"54" ; -- r/w
+	subtype sub_Address is std_logic_vector(11 downto 4);
+	constant BASE_TRIG_InputPatternMask_IN1 : sub_Address 			:= x"50" ; -- r/w
+	constant BASE_TRIG_InputPatternMask_IN2 : sub_Address 			:= x"51" ; -- r/w
+	constant BASE_TRIG_InputPatternMask_IN3 : sub_Address 			:= x"52" ; -- r/w
+	constant BASE_TRIG_InputPatternMask_INOUT1 : sub_Address			:= x"53" ; -- r/w
+	constant BASE_TRIG_InputPatternMask_INOUT2 : sub_Address			:= x"54" ; -- r/w
 
-	constant BASE_TRIG_FIXED : sub_Adress 								:= x"f0" ; -- r
-	constant TRIG_FIXED_Master : std_logic_vector(31 downto 0)  := x"12112103"; -- 21.11.2012
+	--debug
+	constant BASE_TRIG_Debug_ActualState : sub_Address							:= x"e0"; --r
+	constant BASE_TRIG_SelectedDebugInput_1 : sub_Address						:= x"e1"; --r/w
+	constant BASE_TRIG_SelectedDebugInput_2 : sub_Address						:= x"e2"; --r/w
+	constant BASE_TRIG_SelectedDebugInput_3 : sub_Address						:= x"e3"; --r/w
+	constant BASE_TRIG_SelectedDebugInput_4 : sub_Address						:= x"e4"; --r/w
+
+	constant BASE_TRIG_FIXED : sub_Address 								:= x"f0" ; -- r
 
 	------------------------------------------------------------------------------
 	
@@ -47,6 +56,7 @@ architecture RTL of trigger is
 	signal Post_trig_in, Post_trig_in_short : std_logic_vector(5*32-1 downto 0);
 	
 	--BaF2 Vetos
+	signal Raw_LED_Signals : std_logic_vector(127 downto 0);
 	signal LED_Signals_Sector_1, LED_Signals_Sector_2 : std_logic_vector(63 downto 0);
 	signal LED_SectorOR_1, LED_SectorOR_2 : std_logic;
 
@@ -70,12 +80,137 @@ architecture RTL of trigger is
 				  sig_out : out  STD_LOGIC;
 				  clock : in  STD_LOGIC);
 	end component;
+	
+	COMPONENT Input_Enlarger
+	Generic (
+		Width : integer := 200
+		);
+	PORT(
+		clock : IN std_logic;
+		input_signal : IN std_logic;          
+		output_signal : OUT std_logic
+		);
+	END COMPONENT;
+
+	constant NumberCFDOfSignals: integer := 128;
+	constant NumberOfSignalsPerModule: integer := 8;
+	signal LongCFDSignals : std_logic_vector(NumberCFDOfSignals-1 downto 0);
+	signal NTECModuleDataPresentSignal, NTECModuleDataPresentSignal_Saved : std_logic_vector( (NumberCFDOfSignals/NumberOfSignalsPerModule)-1 downto 0);
+	signal ExperimentTriggerSignal : std_logic;
+	signal ExperimentTriggerSignal_Gated : std_logic_vector(1 downto 0);
+	
+	COMPONENT EventIDSender
+	PORT(
+		UserEventID : IN std_logic_vector(31 downto 0);
+		ResetSenderCounter : IN std_logic;
+		clock50 : IN std_logic;          
+		StatusCounter : OUT std_logic_vector(6 downto 0);
+		OutputPin : OUT std_logic
+		);
+	END COMPONENT;
+	
+	signal ModuleEventIDInput : std_logic_vector(31 downto 0);
+	signal SenderResetID : std_logic;
+	signal ModuleDataSignalOut : std_logic;
+
+	------------------------------------------------------------------------------
+	-- DebugChSelector
+
+	COMPONENT DebugChSelector
+	PORT(
+		DebugSignalsIn : IN std_logic_vector(479 downto 0);
+		SelectedInput : IN std_logic_vector(8 downto 0);          
+		SelectedOutput : OUT std_logic
+		);
+	END COMPONENT;
+
+	constant NDebugSignalOutputs : integer := 4;
+	signal DebugSignals : std_logic_vector(479 downto 0);
+	signal SelectedDebugInput : std_logic_vector(9*NDebugSignalOutputs-1 downto 0);
+	signal Debug_ActualState : std_logic_vector(NDebugSignalOutputs-1 downto 0);
+
+	------------------------------------------------------------------------------
+
+
+begin
+	TRIG_FIXED(31 downto 24) <= CONV_STD_LOGIC_VECTOR(FirmwareType, 8);
+	TRIG_FIXED(23 downto 16) <= CONV_STD_LOGIC_VECTOR(0, 8);
+	TRIG_FIXED(15 downto 0)  <= CONV_STD_LOGIC_VECTOR(FirmwareRevision, 16);
+
+	Raw_LED_Signals <= trig_in(4*32-1 downto 2*32) & trig_in(2*32-1 downto 0*32);
+
+	LengthenCFDSignals: for i in 0 to NumberCFDOfSignals-1 generate
+		CFDEnlarger: Input_Enlarger 
+			GENERIC MAP(Width => 270) --2.7 mu s
+			PORT MAP(
+				clock => clock100,
+				input_signal => Raw_LED_Signals(i),
+				output_signal => LongCFDSignals(i)
+			);
+	end generate;
+
+	ModuleDataSignals: for i in 0 to (NumberCFDOfSignals/NumberOfSignalsPerModule)-1 generate
+		NTECModuleDataPresentSignal(i) <= '1' when LongCFDSignals((NumberOfSignalsPerModule-1)+i*NumberOfSignalsPerModule downto 0+i*NumberOfSignalsPerModule) /= "0" else '0';
+	end generate;
+
+	ExperimentTriggerSignal <= nim_in; -- Experiment Trigger triggers the sending of Pattern Mask (data tells which NTEC card has data)
+	process(clock50)
+	begin
+		if rising_edge(clock50) then
+			ExperimentTriggerSignal_Gated(0) <= ExperimentTriggerSignal;
+			ExperimentTriggerSignal_Gated(1) <= ExperimentTriggerSignal_Gated(0);
+		end if;
+	end process;
+	
+	process(clock50)
+	begin
+		if rising_edge(clock50) then
+			SenderResetID <= '0';
+			if ExperimentTriggerSignal_Gated = "01" then
+				SenderResetID <= '1';
+				NTECModuleDataPresentSignal_Saved <= NTECModuleDataPresentSignal;
+			end if;
+		end if;
+	end process;
+	
+	ModuleEventIDInput <= (31 downto 16 => '0') & NTECModuleDataPresentSignal_Saved;
+	Inst_ModuleHitPatternSender: EventIDSender PORT MAP(
+		StatusCounter => open,
+		UserEventID => ModuleEventIDInput,
+		ResetSenderCounter => SenderResetID,
+		OutputPin => ModuleDataSignalOut,
+		clock50 => clock50
+	);
+	nim_out <= ModuleDataSignalOut;
 
 	
-begin
+	
 	------------------------------------------------------------------------------------------------
 	-- Enable/Disable individual channels
 	Post_trig_in <= trig_in(5*32-1 downto 0) and InputPatternMask;
+
+
+	DebugSignals(6*32-1 downto 0) <= trig_in;
+	DebugSignals(6*32) <= NIM_IN;
+	DebugSignals(6*32+1) <= SenderResetID;
+	DebugSignals(6*32+2) <= ModuleDataSignalOut;
+	DebugSignals(6*32+3+15 downto 6*32+3) <= NTECModuleDataPresentSignal;
+	
+
+	-------------------------------------------------------------------------------------------------
+	-- Debug Selector
+	DebugChSelectors: for i in 0 to NDebugSignalOutputs-1 generate
+   begin
+		Inst_DebugChSelector: DebugChSelector PORT MAP(
+			DebugSignalsIn => DebugSignals,
+			SelectedInput => SelectedDebugInput((i+1)*9-1 downto i*9),  ---needs VME write
+			SelectedOutput => Debug_ActualState(i)
+		);
+	end generate;
+	trig_out(15 downto 12) <= Debug_ActualState;
+	-------------------------------------------------------------------------------------------------
+
+
 
 	------------------------------------------------------------------------------------------------
 	-- Switch on corresponding LED if cable is connected
@@ -133,8 +268,8 @@ begin
 	trig_out(1+32) <= CFD_PWO_SectorOR_2;
 	trig_out(2) <= CFD_VETO_SectorOR_1;
 	trig_out(2+32) <= CFD_VETO_SectorOR_2;
-	--trig_out(31) <= nim_in;
-	--trig_out(31+32) <= nim_in;
+	trig_out(3) <= ExperimentTriggerSignal;
+	trig_out(3+32) <= ExperimentTriggerSignal;
 	
 	
 	----------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -229,19 +364,18 @@ begin
 	begin
 		if (clock50'event and clock50 = '1' and oecsr = '1') then
 			u_data_o <= (others => '0');
-				
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_FIXED) then 
-				u_data_o(31 downto 0) <= TRIG_FIXED_Master; end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_IN1) then 
-				u_data_o(31 downto 0) <= InputPatternMask(32*0+31 downto 32*0+0); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_IN2) then 
-				u_data_o(31 downto 0) <= InputPatternMask(32*1+31 downto 32*1+0); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_IN3) then 
-				u_data_o(31 downto 0) <= InputPatternMask(32*2+31 downto 32*2+0); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_INOUT1) then 
-				u_data_o(31 downto 0) <= InputPatternMask(32*3+31 downto 32*3+0); end if;
-			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_INOUT2) then 
-				u_data_o(31 downto 0) <= InputPatternMask(32*4+31 downto 32*4+0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_FIXED) then 			u_data_o(31 downto 0) <= TRIG_FIXED; end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_IN1) then	u_data_o(31 downto 0) <= InputPatternMask(32*0+31 downto 32*0+0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_IN2) then 	u_data_o(31 downto 0) <= InputPatternMask(32*1+31 downto 32*1+0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_IN3) then 	u_data_o(31 downto 0) <= InputPatternMask(32*2+31 downto 32*2+0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_INOUT1) then 	u_data_o(31 downto 0) <= InputPatternMask(32*3+31 downto 32*3+0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_INOUT2) then 	u_data_o(31 downto 0) <= InputPatternMask(32*4+31 downto 32*4+0); end if;
+			--debug
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_1) then 			u_data_o(8 downto 0) <= SelectedDebugInput(9*1-1 downto 9*0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_2) then 			u_data_o(8 downto 0) <= SelectedDebugInput(9*2-1 downto 9*1); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_3) then 			u_data_o(8 downto 0) <= SelectedDebugInput(9*3-1 downto 9*2); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_4) then 			u_data_o(8 downto 0) <= SelectedDebugInput(9*4-1 downto 9*3); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_Debug_ActualState) then 				u_data_o(NDebugSignalOutputs-1 downto 0) <= Debug_ActualState; end if;
 
 		end if;
 	end process;
@@ -254,17 +388,17 @@ begin
 	process(clock50, ckcsr, u_ad_reg)
 	begin
 		if (clock50'event and clock50 ='1') then
-			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_IN1 ) then
-				InputPatternMask(32*0+31 downto 32*0+0) <= u_dat_in; end if;
-			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_IN2 ) then
-				InputPatternMask(32*1+31 downto 32*1+0) <= u_dat_in; end if;
-			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_IN3 ) then
-				InputPatternMask(32*2+31 downto 32*2+0) <= u_dat_in; end if;
-			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_INOUT1 ) then
-				InputPatternMask(32*3+31 downto 32*3+0) <= u_dat_in; end if;
-			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_INOUT2 ) then
-				InputPatternMask(32*4+31 downto 32*4+0) <= u_dat_in; end if;
-			
+			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_IN1 ) then 		InputPatternMask(32*0+31 downto 32*0+0) <= u_dat_in; end if;
+			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_IN2 ) then		InputPatternMask(32*1+31 downto 32*1+0) <= u_dat_in; end if;
+			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_IN3 ) then		InputPatternMask(32*2+31 downto 32*2+0) <= u_dat_in; end if;
+			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_INOUT1 ) then	InputPatternMask(32*3+31 downto 32*3+0) <= u_dat_in; end if;
+			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_INOUT2 ) then	InputPatternMask(32*4+31 downto 32*4+0) <= u_dat_in; end if;
+			--debug
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_1) ) then 			SelectedDebugInput(9*1-1 downto 9*0) <= u_dat_in(8 downto 0); end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_2) ) then 			SelectedDebugInput(9*2-1 downto 9*1) <= u_dat_in(8 downto 0); end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_3) ) then 			SelectedDebugInput(9*3-1 downto 9*2) <= u_dat_in(8 downto 0); end if;
+			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_4) ) then 			SelectedDebugInput(9*4-1 downto 9*3) <= u_dat_in(8 downto 0); end if;
+
 		end if;
 	end process;
 	
