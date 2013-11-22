@@ -45,10 +45,10 @@ begin
 
 	process(SenderClock)
 	begin
-		if rising_edge(SenderClock) then
-			if (ResetSenderCounter = '1') then
-				Inter_StatusCounter <= b"0000000";
-			elsif (Inter_StatusCounter(6) = '0') then
+		if (ResetSenderCounter = '1') then
+			Inter_StatusCounter <= b"0000000";
+		elsif rising_edge(SenderClock) then
+			if (Inter_StatusCounter(6) = '0') then
 				Inter_StatusCounter <= Inter_StatusCounter +1;
 			else
 				Inter_StatusCounter <= Inter_StatusCounter;

@@ -31,7 +31,7 @@ end trigger;
 
 architecture RTL of trigger is
 	constant FirmwareType: integer := 6;
-	constant FirmwareRevision: integer := 8;
+	constant FirmwareRevision: integer := 9;
 	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
 	subtype sub_Address is std_logic_vector(11 downto 4);
@@ -110,7 +110,7 @@ architecture RTL of trigger is
 	END COMPONENT;
 	
 	signal ModuleEventIDInput : std_logic_vector(31 downto 0);
-	signal SenderResetID : std_logic;
+	signal SenderResetID : std_logic := '0';
 	signal ModuleDataSignalOut : std_logic;
 
 	------------------------------------------------------------------------------
@@ -195,6 +195,8 @@ begin
 	DebugSignals(6*32+1) <= SenderResetID;
 	DebugSignals(6*32+2) <= ModuleDataSignalOut;
 	DebugSignals(6*32+3+15 downto 6*32+3) <= NTECModuleDataPresentSignal;
+	DebugSignals(243+127 downto 243) <= LongCFDSignals;
+	DebugSignals(243+127+16 downto 243+128) <= NTECModuleDataPresentSignal_Saved;
 	
 
 	-------------------------------------------------------------------------------------------------

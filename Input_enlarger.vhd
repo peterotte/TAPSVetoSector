@@ -15,7 +15,8 @@ entity Input_Enlarger is
 end Input_Enlarger;
 
 architecture Behavioral of Input_Enlarger is
-	signal WaitCounter : STD_LOGIC_VECTOR (7 downto 0);
+	constant NumberOfBits : integer := 9;
+	signal WaitCounter : STD_LOGIC_VECTOR (NumberOfBits downto 0);
 	signal Input_Reg : std_logic_vector(1 downto 0);
 	signal inter_output_signal : std_logic;
 
@@ -34,7 +35,7 @@ begin
 			if (Input_Reg = b"01") then --leading edge of input signal
 				WaitCounter <= (others => '0');
 				inter_output_signal <= '1';
-			elsif (WaitCounter = CONV_STD_LOGIC_VECTOR(Width, 8) ) then
+			elsif (WaitCounter = CONV_STD_LOGIC_VECTOR(Width, NumberOfBits) ) then
 				WaitCounter <= (others => '1');
 				inter_output_signal <= '0';
 			else
