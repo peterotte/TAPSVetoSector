@@ -31,7 +31,7 @@ end trigger;
 
 architecture RTL of trigger is
 	constant FirmwareType: integer := 6;
-	constant FirmwareRevision: integer := 7;
+	constant FirmwareRevision: integer := 8;
 	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
 	subtype sub_Address is std_logic_vector(11 downto 4);
@@ -260,7 +260,7 @@ begin
 	CFD_VETO_SectorOR_1 <= '1' when CFD_VETO_Sector_1 /= "0" else '0';
 	CFD_VETO_SectorOR_2 <= '1' when CFD_VETO_Sector_2 /= "0" else '0';
 
-	nim_out <= LED_SectorOR_1 or LED_SectorOR_2 or CFD_PWO_SectorOR_1 or CFD_PWO_SectorOR_2 or CFD_VETO_SectorOR_1 or CFD_VETO_SectorOR_2;
+	--nim_out <= LED_SectorOR_1 or LED_SectorOR_2 or CFD_PWO_SectorOR_1 or CFD_PWO_SectorOR_2 or CFD_VETO_SectorOR_1 or CFD_VETO_SectorOR_2;
 	
 	trig_out(0) <= LED_SectorOR_1;
 	trig_out(0+32) <= LED_SectorOR_2;
