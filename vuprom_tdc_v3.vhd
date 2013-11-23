@@ -164,7 +164,7 @@ architecture rtl of vuprom_TAPSVetoSector is
 --+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
 --     CLOCK 
 --+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
-	signal clk50, clk100, clk200, clk400: std_logic;
+	signal clk50, clk100, clk200, clk400, clk1 : std_logic;
 	signal clk_rst, clk_locked: std_logic_vector ( 3 downto 0);
 
 	COMPONENT clock_boost
@@ -176,7 +176,9 @@ architecture rtl of vuprom_TAPSVetoSector is
 		CLK50MHz_OUT : OUT std_logic;
 		CLK100MHz_OUT : OUT std_logic;
 		CLK200MHz_OUT : OUT std_logic;
-		CLK400MHz_OUT : OUT std_logic
+		CLK400MHz_OUT : OUT std_logic;
+		clock1MHz_OUT : out  STD_LOGIC;
+		clock0_5Hz_OUT : out  STD_LOGIC
 		);
 	END COMPONENT;
  
@@ -202,7 +204,7 @@ architecture rtl of vuprom_TAPSVetoSector is
 			  LCD_SCP : inout STD_LOGIC;
 			  LCD_LED_GRN : inout  STD_LOGIC;
 			  LCD_LED_RED : inout  STD_LOGIC;
-	--		DSP interface -------------------------
+					--		VME interface -------------------------
 				clk50			: in std_logic;
 				disp_in : in std_logic_vector(3 downto 0);
 				u_ad_reg :in std_logic_vector(11 downto 2);
@@ -272,6 +274,7 @@ architecture rtl of vuprom_TAPSVetoSector is
 			clock100 : in STD_LOGIC;
 			clock200 : in STD_LOGIC;
 			clock400 : in STD_LOGIC;
+			clock1 : in STD_LOGIC;
 			trig_in : in STD_LOGIC_VECTOR ( 191 downto 0);	
 			trig_out : out STD_LOGIC_VECTOR ( 63 downto 0);
 			nim_in   : in  STD_LOGIC;
@@ -308,7 +311,9 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 		CLK200MHz_OUT => clk200,
 		CLK400MHz_OUT => clk400,
 		CLK_LOCKED_OUT => clk_locked,
-		CLK_RST_IN => clk_rst
+		CLK_RST_IN => clk_rst,
+		clock1MHz_OUT => clk1,
+		clock0_5Hz_OUT => open
 	);
 
 	------------------------------------------------------------------------------------------
@@ -590,6 +595,7 @@ begin ---- BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN  BEGIN -------
 			clock100=>clk100,
 			clock200=>clk200,
 			clock400=>clk400,
+			clock1=>clk1,
 			trig_in=>trig_in,
 			trig_out=>trig_out,
 			nim_in => LEMIN1,

@@ -2,34 +2,13 @@
 -- should be 0x3
 -- To Reset the PLLs: ./vmeext 0xXX004000 0x3 w
 
-----------------------------------------------------------------------------------
--- Company:  GSI
--- Engineer: S.Minami
--- 
--- Create Date:    13:46:21 04/14/2008 
--- Design Name: 
--- Module Name:    clock_boost - Behavioral 
--- Project Name: 
--- Target Devices: 
--- Tool versions: 
--- Description: 
---
--- Dependencies: 
---
--- Revision: 
--- Revision 0.01 - File Created
--- Additional Comments: 
---
-----------------------------------------------------------------------------------
+-- Engineer: S.Minami, Peter-Bernd Otte
+-- 2.4.2012
+ 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
-
----- Uncomment the following library declaration if instantiating
----- any Xilinx primitives in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
 
 entity clock_boost is
     Port ( CLKIN_N_IN : in  STD_LOGIC;
@@ -39,7 +18,10 @@ entity clock_boost is
 			  CLK50MHz_OUT : out  STD_LOGIC;
            CLK100MHz_OUT : out  STD_LOGIC;
            CLK200MHz_OUT : out  STD_LOGIC;
-           CLK400MHz_OUT : out  STD_LOGIC );
+           CLK400MHz_OUT : out  STD_LOGIC;
+			  clock1MHz_OUT : out  STD_LOGIC;
+			  clock0_5Hz_OUT : out  STD_LOGIC
+		  );
  
 end clock_boost;
 
@@ -72,6 +54,7 @@ architecture Behavioral of clock_boost is
 	signal locked, reset : std_logic_vector ( 3 downto 0);
 	signal locked4 : std_logic;
 	signal clk100_2, clk200_2: std_logic;
+	signal clock1MHz, clock0_5Hz : std_logic;
 begin
 
 	CLK50MHz_OUT <= clk50;
@@ -99,5 +82,37 @@ begin
 		CLK2X_OUT => clk400,
 		LOCKED_OUT => locked(1) 
 	);
+	
+	process (clk50)
+	variable Counter : integer; 
+	begin
+		if rising_edge(clk50) then
+			Counter := Counter +1;
+			if Counter > 24 then --24 gives (24+1) * 20ns long pulses
+				Counter := 0;
+				clock1MHz <= not clock1MHz;
+			else
+				clock1MHz <= clock1MHz;
+			end if;
+		end if;
+	end process;
+	clock1MHz_OUT <= clock1MHz;
+	
+	process (clock1MHz)
+	variable Counter : integer; 
+	begin
+		if rising_edge(clock1MHz) then
+			Counter := Counter +1;
+			if Counter > 1000000-1 then --1000000-1 gives (1000000) * 1µs long pulses
+				Counter := 0;
+				clock0_5Hz <= not clock0_5Hz;
+			else
+				clock0_5Hz <= clock0_5Hz;
+			end if;
+		end if;
+	end process;
+	clock0_5Hz_OUT <= clock0_5Hz;
+
+	
 		
 end Behavioral;

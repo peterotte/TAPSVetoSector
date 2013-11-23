@@ -12,6 +12,7 @@ entity trigger is
 		clock100 : in STD_LOGIC;
 		clock200 : in STD_LOGIC;
 		clock400 : in STD_LOGIC; 
+		clock1 : in STD_LOGIC;
 		trig_in : in STD_LOGIC_VECTOR (191 downto 0);		
 		trig_out : out STD_LOGIC_VECTOR (63 downto 0);
 		nim_in   : in  STD_LOGIC;
@@ -31,7 +32,7 @@ end trigger;
 
 architecture RTL of trigger is
 	constant FirmwareType: integer := 6;
-	constant FirmwareRevision: integer := 9;
+	constant FirmwareRevision: integer := 10;
 	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
 	subtype sub_Address is std_logic_vector(11 downto 4);
@@ -40,6 +41,8 @@ architecture RTL of trigger is
 	constant BASE_TRIG_InputPatternMask_IN3 : sub_Address 			:= x"52" ; -- r/w
 	constant BASE_TRIG_InputPatternMask_INOUT1 : sub_Address			:= x"53" ; -- r/w
 	constant BASE_TRIG_InputPatternMask_INOUT2 : sub_Address			:= x"54" ; -- r/w
+
+	constant BASE_TRIG_DisableNIMOUT : sub_Address						:= x"b0" ; -- r/w
 
 	--debug
 	constant BASE_TRIG_Debug_ActualState : sub_Address							:= x"e0"; --r
@@ -131,6 +134,7 @@ architecture RTL of trigger is
 
 	------------------------------------------------------------------------------
 
+	signal DisableNIMOUT: std_logic := '0';
 
 begin
 	TRIG_FIXED(31 downto 24) <= CONV_STD_LOGIC_VECTOR(FirmwareType, 8);
@@ -181,7 +185,7 @@ begin
 		OutputPin => ModuleDataSignalOut,
 		clock50 => clock50
 	);
-	nim_out <= ModuleDataSignalOut;
+	nim_out <= ModuleDataSignalOut when DisableNIMOUT = '0' else '0';
 
 	
 	
@@ -197,6 +201,7 @@ begin
 	DebugSignals(6*32+3+15 downto 6*32+3) <= NTECModuleDataPresentSignal;
 	DebugSignals(243+127 downto 243) <= LongCFDSignals;
 	DebugSignals(243+127+16 downto 243+128) <= NTECModuleDataPresentSignal_Saved;
+	DebugSignals(479) <= clock1;
 	
 
 	-------------------------------------------------------------------------------------------------
@@ -372,6 +377,7 @@ begin
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_IN3) then 	u_data_o(31 downto 0) <= InputPatternMask(32*2+31 downto 32*2+0); end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_INOUT1) then 	u_data_o(31 downto 0) <= InputPatternMask(32*3+31 downto 32*3+0); end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_INOUT2) then 	u_data_o(31 downto 0) <= InputPatternMask(32*4+31 downto 32*4+0); end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DisableNIMOUT) then 					u_data_o(0) <= DisableNIMOUT; end if;
 			--debug
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_1) then 			u_data_o(8 downto 0) <= SelectedDebugInput(9*1-1 downto 9*0); end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_2) then 			u_data_o(8 downto 0) <= SelectedDebugInput(9*2-1 downto 9*1); end if;
@@ -395,6 +401,7 @@ begin
 			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_IN3 ) then		InputPatternMask(32*2+31 downto 32*2+0) <= u_dat_in; end if;
 			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_INOUT1 ) then	InputPatternMask(32*3+31 downto 32*3+0) <= u_dat_in; end if;
 			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_InputPatternMask_INOUT2 ) then	InputPatternMask(32*4+31 downto 32*4+0) <= u_dat_in; end if;
+			if (ckcsr='1' and u_ad_reg(11 downto 4)= BASE_TRIG_DisableNIMOUT ) then	DisableNIMOUT <= u_dat_in(0); end if;
 			--debug
 			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_1) ) then 			SelectedDebugInput(9*1-1 downto 9*0) <= u_dat_in(8 downto 0); end if;
 			if ( (ckcsr = '1') and (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_2) ) then 			SelectedDebugInput(9*2-1 downto 9*1) <= u_dat_in(8 downto 0); end if;
