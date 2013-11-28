@@ -15,7 +15,7 @@ entity Input_Enlarger is
 end Input_Enlarger;
 
 architecture Behavioral of Input_Enlarger is
-	constant NumberOfBits : integer := 9;
+	constant NumberOfBits : integer := 10;
 	signal WaitCounter : STD_LOGIC_VECTOR (NumberOfBits downto 0);
 	signal Input_Reg : std_logic_vector(1 downto 0);
 	signal inter_output_signal : std_logic;

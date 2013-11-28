@@ -32,7 +32,7 @@ end trigger;
 
 architecture RTL of trigger is
 	constant FirmwareType: integer := 6;
-	constant FirmwareRevision: integer := 10;
+	constant FirmwareRevision: integer := 13;
 	signal TRIG_FIXED : std_logic_vector(31 downto 0); 
 
 	subtype sub_Address is std_logic_vector(11 downto 4);
@@ -41,6 +41,8 @@ architecture RTL of trigger is
 	constant BASE_TRIG_InputPatternMask_IN3 : sub_Address 			:= x"52" ; -- r/w
 	constant BASE_TRIG_InputPatternMask_INOUT1 : sub_Address			:= x"53" ; -- r/w
 	constant BASE_TRIG_InputPatternMask_INOUT2 : sub_Address			:= x"54" ; -- r/w
+	
+	constant BASE_TRIG_ReadBitPatternToBeSend : sub_Address			:= x"80" ; -- r
 
 	constant BASE_TRIG_DisableNIMOUT : sub_Address						:= x"b0" ; -- r/w
 
@@ -145,7 +147,7 @@ begin
 
 	LengthenCFDSignals: for i in 0 to NumberCFDOfSignals-1 generate
 		CFDEnlarger: Input_Enlarger 
-			GENERIC MAP(Width => 270) --2.7 mu s
+			GENERIC MAP(Width => 500) --5.0 mu s
 			PORT MAP(
 				clock => clock100,
 				input_signal => Raw_LED_Signals(i),
@@ -378,6 +380,7 @@ begin
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_INOUT1) then 	u_data_o(31 downto 0) <= InputPatternMask(32*3+31 downto 32*3+0); end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_InputPatternMask_INOUT2) then 	u_data_o(31 downto 0) <= InputPatternMask(32*4+31 downto 32*4+0); end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_DisableNIMOUT) then 					u_data_o(0) <= DisableNIMOUT; end if;
+			if (u_ad_reg(11 downto 4) =  BASE_TRIG_ReadBitPatternToBeSend) then 					u_data_o(15 downto 0) <= NTECModuleDataPresentSignal_Saved; end if;
 			--debug
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_1) then 			u_data_o(8 downto 0) <= SelectedDebugInput(9*1-1 downto 9*0); end if;
 			if (u_ad_reg(11 downto 4) =  BASE_TRIG_SelectedDebugInput_2) then 			u_data_o(8 downto 0) <= SelectedDebugInput(9*2-1 downto 9*1); end if;
